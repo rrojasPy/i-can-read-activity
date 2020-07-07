@@ -22,11 +22,15 @@
 import os
 import time
 
-import gtk
-import gst
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gdk
+from gi.repository import Gtk
 
-import gobject
-gobject.threads_init()
+gi.require_version('Gst', '1.0')
+from gi.repository import GObject, Gst
+
+GObject.threads_init()
 
 
 class Grecord:
@@ -41,7 +45,7 @@ class Grecord:
         self._audio_transcode_handler = None
         self._transcode_id = None
 
-        self._pipeline = gst.Pipeline("Record")
+        self._pipeline = Gst.Pipeline("Record")
         self._create_audiobin()
 
         bus = self._pipeline.get_bus()
@@ -49,43 +53,43 @@ class Grecord:
         bus.connect('message', self._bus_message_handler)
 
     def _create_audiobin(self):
-        src = gst.element_factory_make("alsasrc", "absrc")
+        src = Gst.element_factory_make("alsasrc", "absrc")
 
         # attempt to use direct access to the 0,0 device, solving some A/V
         # sync issues
         src.set_property("device", "plughw:0,0")
-        hwdev_available = src.set_state(gst.STATE_PAUSED) != \
-                          gst.STATE_CHANGE_FAILURE
-        src.set_state(gst.STATE_NULL)
+        hwdev_available = src.set_state(Gst.STATE_PAUSED) != \
+                          Gst.STATE_CHANGE_FAILURE
+        src.set_state(Gst.STATE_NULL)
         if not hwdev_available:
             src.set_property("device", "default")
 
-        srccaps = gst.Caps("audio/x-raw-int,rate=16000,channels=1,depth=16")
+        srccaps = Gst.Caps("audio/x-raw-int,rate=16000,channels=1,depth=16")
 
         # guarantee perfect stream, important for A/V sync
-        rate = gst.element_factory_make("audiorate")
+        rate = Gst.element_factory_make("audiorate")
 
-        # without a buffer here, gstreamer struggles at the start of the
+        # without a buffer here, Gstreamer struggles at the start of the
         # recording and then the A/V sync is bad for the whole video
-        # (possibly a gstreamer/ALSA bug -- even if it gets caught up, it
+        # (possibly a Gstreamer/ALSA bug -- even if it gets caught up, it
         # should be able to resync without problem)
-        queue = gst.element_factory_make("queue", "audioqueue")
+        queue = Gst.element_factory_make("queue", "audioqueue")
         queue.set_property("leaky", True) # prefer fresh data
         queue.set_property("max-size-time", 5000000000) # 5 seconds
         queue.set_property("max-size-buffers", 500)
         queue.connect("overrun", self._log_queue_overrun)
 
-        enc = gst.element_factory_make("wavenc", "abenc")
+        enc = Gst.element_factory_make("wavenc", "abenc")
 
-        sink = gst.element_factory_make("filesink", "absink")
+        sink = Gst.element_factory_make("filesink", "absink")
         sink.set_property("location",
             os.path.join(self._activity.datapath, 'output.wav'))
 
-        self._audiobin = gst.Bin("audiobin")
+        self._audiobin = Gst.Bin("audiobin")
         self._audiobin.add(src, rate, queue, enc, sink)
 
         src.link(rate, srccaps)
-        gst.element_link_many(rate, queue, enc, sink)
+        Gst.element_link_many(rate, queue, enc, sink)
 
     def _log_queue_overrun(self, queue):
         cbuffers = queue.get_property("current-level-buffers")
@@ -93,18 +97,18 @@ class Grecord:
         ctime = queue.get_property("current-level-time")
  
     def play(self):
-        if self._get_state() == gst.STATE_PLAYING:
+        if self._get_state() == Gst.STATE_PLAYING:
             return
 
-        self._pipeline.set_state(gst.STATE_PLAYING)
+        self._pipeline.set_state(Gst.STATE_PLAYING)
         self._playing = True
 
     def pause(self):
-        self._pipeline.set_state(gst.STATE_PAUSED)
+        self._pipeline.set_state(Gst.STATE_PAUSED)
         self._playing = False
 
     def stop(self):
-        self._pipeline.set_state(gst.STATE_NULL)
+        self._pipeline.set_state(Gst.STATE_NULL)
         self._playing = False
 
     def is_playing(self):
@@ -115,10 +119,10 @@ class Grecord:
 
     def stop_recording_audio(self):
         # We should be able to simply pause and remove the audiobin, but
-        # this seems to cause a gstreamer segfault. So we stop the whole
+        # this seems to cause a Gstreamer segfault. So we stop the whole
         # pipeline while manipulating it.
         # http://dev.laptop.org/ticket/10183
-        self._pipeline.set_state(gst.STATE_NULL)
+        self._pipeline.set_state(Gst.STATE_NULL)
         self._pipeline.remove(self._audiobin)
         self.play()
 
@@ -128,7 +132,7 @@ class Grecord:
             return
 
         line = 'filesrc location=' + audio_path + ' name=audioFilesrc ! wavparse name=audioWavparse ! audioconvert name=audioAudioconvert ! vorbisenc name=audioVorbisenc ! oggmux name=audioOggmux ! filesink name=audioFilesink'
-        audioline = gst.parse_launch(line)
+        audioline = Gst.parse_launch(line)
 
         vorbis_enc = audioline.get_by_name('audioVorbisenc')
 
@@ -141,9 +145,9 @@ class Grecord:
         audioBus.add_signal_watch()
         self._audio_transcode_handler = audioBus.connect(
             'message', self._onMuxedAudioMessageCb, audioline)
-        self._transcode_id = gobject.timeout_add(200, self._transcodeUpdateCb,
+        self._transcode_id = GObject.timeout_add(200, self._transcodeUpdateCb,
                                                  audioline)
-        audioline.set_state(gst.STATE_PLAYING)
+        audioline.set_state(Gst.STATE_PLAYING)
 
     def blockedCb(self, x, y, z):
         pass
@@ -153,39 +157,39 @@ class Grecord:
         # this results in several seconds of silence being added at the start
         # of the recording. So we stop the whole pipeline while adjusting it.
         # SL#2040
-        self._pipeline.set_state(gst.STATE_NULL)
+        self._pipeline.set_state(Gst.STATE_NULL)
         self._pipeline.add(self._audiobin)
         self.play()
 
     def _transcodeUpdateCb(self, pipe):
         position, duration = self._query_position(pipe)
-        if position != gst.CLOCK_TIME_NONE:
+        if position != Gst.CLOCK_TIME_NONE:
             value = position * 100.0 / duration
             value = value/100.0
         return True
 
     def _query_position(self, pipe):
         try:
-            position, format = pipe.query_position(gst.FORMAT_TIME)
+            position, format = pipe.query_position(Gst.FORMAT_TIME)
         except:
-            position = gst.CLOCK_TIME_NONE
+            position = Gst.CLOCK_TIME_NONE
 
         try:
-            duration, format = pipe.query_duration(gst.FORMAT_TIME)
+            duration, format = pipe.query_duration(Gst.FORMAT_TIME)
         except:
-            duration = gst.CLOCK_TIME_NONE
+            duration = Gst.CLOCK_TIME_NONE
 
         return (position, duration)
 
     def _onMuxedAudioMessageCb(self, bus, message, pipe):
-        if message.type != gst.MESSAGE_EOS:
+        if message.type != Gst.MESSAGE_EOS:
             return True
 
-        gobject.source_remove(self._audio_transcode_handler)
+        GObject.source_remove(self._audio_transcode_handler)
         self._audio_transcode_handler = None
-        gobject.source_remove(self._transcode_id)
+        GObject.source_remove(self._transcode_id)
         self._transcode_id = None
-        pipe.set_state(gst.STATE_NULL)
+        pipe.set_state(Gst.STATE_NULL)
         pipe.get_bus().remove_signal_watch()
         pipe.get_bus().disable_sync_message_emission()
 
@@ -196,15 +200,15 @@ class Grecord:
 
     def _bus_message_handler(self, bus, message):
         t = message.type
-        if t == gst.MESSAGE_EOS:
+        if t == Gst.MESSAGE_EOS:
             if self._eos_cb:
                 cb = self._eos_cb
                 self._eos_cb = None
                 cb()
-        elif t == gst.MESSAGE_ERROR:
+        elif t == Gst.MESSAGE_ERROR:
             # TODO: if we come out of suspend/resume with errors, then
             # get us back up and running...  TODO: handle "No space
-            # left on the resource.gstfilesink.c" err, debug =
+            # left on the resource.Gstfilesink.c" err, debug =
             # message.parse_error()
             pass
 

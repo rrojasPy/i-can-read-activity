@@ -11,9 +11,13 @@
 # Free Software Foundation, Inc., 59 Temple Place - Suite 330,
 # Boston, MA 02111-1307, USA.
 
-import gtk
+import gi
 import os
 import codecs
+
+
+from gi.repository import Gtk
+from gi.repository import Gdk
 
 from gettext import gettext as _
 
@@ -27,7 +31,7 @@ import logging
 _logger = logging.getLogger('infused-activity')
 
 try:
-    from sugar.graphics import style
+    from sugar3.graphics import style
     GRID_CELL_SIZE = style.GRID_CELL_SIZE
 except ImportError:
     GRID_CELL_SIZE = 0
@@ -73,15 +77,16 @@ class Page():
             self._canvas = canvas
             self._activity.show_all()
 
-        self._canvas.set_flags(gtk.CAN_FOCUS)
-        self._canvas.add_events(gtk.gdk.BUTTON_PRESS_MASK)
-        self._canvas.add_events(gtk.gdk.BUTTON_RELEASE_MASK)
+        #self._canvas.set_flags(Gtk.CAN_FOCUS)
+        self._canvas.set_can_focus(True)
+        self._canvas.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self._canvas.add_events(Gdk.EventMask.BUTTON_RELEASE_MASK)
         self._canvas.connect("expose-event", self._expose_cb)
         self._canvas.connect("button-press-event", self._button_press_cb)
         self._canvas.connect("button-release-event", self._button_release_cb)
         self._canvas.connect("key_press_event", self._keypress_cb)
-        self._width = gtk.gdk.screen_width()
-        self._height = gtk.gdk.screen_height()
+        self._width = Gdk.screen_width()
+        self._height = Gdk.screen_height()
         self._scale = self._width / 240.
         self._sprites = Sprites(self._canvas)
         self.page = 0
@@ -105,7 +110,7 @@ class Page():
         self._looking_at_word_list = False
 
         self._my_canvas = Sprite(self._sprites, 0, 0,
-                                gtk.gdk.Pixmap(self._canvas.window,
+                                Gdk.Pixmap(self._canvas.window,
                                                self._width,
                                                int(self._height * 2.75), -1))
         self._my_canvas.set_layer(0)
@@ -133,7 +138,7 @@ class Page():
         save_page = self.page
         self._clear_all()
 
-        rect = gtk.gdk.Rectangle(0, 0, self._width, int(self._height * 2.75))
+        rect = Gdk.Rectangle(0, 0, self._width, int(self._height * 2.75))
         self._my_canvas.images[0].draw_rectangle(self._my_gc, True, *rect)
         self.invalt(0, 0, self._width, self._height)
         self._my_canvas.set_layer(1)
@@ -195,7 +200,7 @@ class Page():
                 h2 = 1.0 - h1
                 bot.composite(top, 0, int(h1 * top.get_height()),
                               top.get_width(), int(h2 * top.get_height()),
-                              0, 0, 1, 1, gtk.gdk.INTERP_NEAREST, 255)
+                              0, 0, 1, 1, Gdk.INTERP_NEAREST, 255)
                 self._cards.append(Sprite(self._sprites, # self._left,
                     int(self._width - 320 * self._scale / 2.5),
                                           GRID_CELL_SIZE, top))
@@ -213,7 +218,7 @@ class Page():
                                 background=False, stroke=stroke))
                 bot.composite(top, 0, int(h1 * top.get_height()),
                               top.get_width(), int(h2 * top.get_height()),
-                              0, 0, 1, 1, gtk.gdk.INTERP_NEAREST, 255)
+                              0, 0, 1, 1, Gdk.INTERP_NEAREST, 255)
                 self._colored_letters_lower.append(Sprite(
                         self._sprites, 0, 0, top))
                 top = svg_str_to_pixbuf(generate_card(
@@ -230,7 +235,7 @@ class Page():
                                 background=False, stroke=stroke))
                 bot.composite(top, 0, int(h1 * top.get_height()),
                               top.get_width(), int(h2 * top.get_height()),
-                              0, 0, 1, 1, gtk.gdk.INTERP_NEAREST, 255)
+                              0, 0, 1, 1, Gdk.INTERP_NEAREST, 255)
                 self._colored_letters_upper.append(Sprite(
                         self._sprites, 0, 0, top))
             else:
@@ -286,7 +291,7 @@ class Page():
         self._x_pos = self._margin
         self._y_pos = self._cards[self.page].rect.y + \
                       self._cards[self.page].images[0].get_height() + self._lead
-        rect = gtk.gdk.Rectangle(0, 0, self._width, int(self._height * 2.5))
+        rect = Gdk.Rectangle(0, 0, self._width, int(self._height * 2.5))
         self._my_canvas.images[0].draw_rectangle(self._my_gc, True, *rect)
         self.invalt(0, 0, self._width, int(self._height * 2.5))
 
@@ -352,7 +357,7 @@ class Page():
         ''' Read a word list '''
         self._clear_all()
 
-        rect = gtk.gdk.Rectangle(0, 0, self._width, int(self._height * 2.75))
+        rect = Gdk.Rectangle(0, 0, self._width, int(self._height * 2.75))
         self._my_canvas.images[0].draw_rectangle(self._my_gc, True, *rect)
         self.invalt(0, 0, self._width, self._height)
         self._my_canvas.set_layer(1)
@@ -375,7 +380,7 @@ class Page():
         ''' Generate a randomly ordered list of phrases. '''
         self._clear_all()
 
-        rect = gtk.gdk.Rectangle(0, 0, self._width, int(self._height * 2.75))
+        rect = Gdk.Rectangle(0, 0, self._width, int(self._height * 2.75))
         self._my_canvas.images[0].draw_rectangle(self._my_gc, True, *rect)
         self.invalt(0, 0, self._width, self._height)
         self._my_canvas.set_layer(1)
@@ -565,12 +570,12 @@ class Page():
 
     def _destroy_cb(self, win, event):
         ''' Make a clean exit. '''
-        gtk.main_quit()
+        Gtk.main_quit()
 
     def invalt(self, x, y, w, h):
         ''' Mark a region for refresh '''
         self._canvas.window.invalidate_rect(
-            gtk.gdk.Rectangle(int(x), int(y), int(w), int(h)), False)
+            Gdk.Rectangle(int(x), int(y), int(w), int(h)), False)
 
     def load_level(self, path):
         ''' Load a level (CSV) from path: letter, word, color, image,
@@ -619,7 +624,7 @@ class Page():
 
 def svg_str_to_pixbuf(svg_string):
     ''' Load pixbuf from SVG string. '''
-    pl = gtk.gdk.PixbufLoader('svg')
+    pl = Gdk.PixbufLoader('svg')
     pl.write(svg_string)
     pl.close()
     pixbuf = pl.get_pixbuf()
@@ -629,7 +634,7 @@ def svg_str_to_pixbuf(svg_string):
 def image_file_to_pixbuf(file_path, scale):
     ''' Load pixbuf from file '''
     try:
-        return gtk.gdk.pixbuf_new_from_file_at_size(
+        return Gdk.pixbuf_new_from_file_at_size(
             file_path, int(scale * 320), int(scale * 240))
     except:
         _logger.debug('failed to load %s', file_path)

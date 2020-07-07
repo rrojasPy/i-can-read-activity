@@ -77,10 +77,9 @@ def svg_str_to_pixbuf(svg_string):
     return pixbuf
 """
 
-import pygtk
-pygtk.require('2.0')
-import gtk
-import pango
+import gi
+from gi.repository import Gtk
+from gi.repository import Gdk
 
 
 class Sprites:
@@ -158,7 +157,7 @@ class Sprite:
     def __init__(self, sprites, x, y, image):
         """ Initialize an individual sprite """
         self._sprites = sprites
-        self.rect = gtk.gdk.Rectangle(int(x), int(y), 0, 0)
+        self.rect = Gdk.Rectangle(int(x), int(y), 0, 0)
         self._scale = [12]
         self._rescale = [True]
         self._horiz_align = ["center"]
@@ -186,7 +185,7 @@ class Sprite:
         self.images[i] = image
         self._dx[i] = dx
         self._dy[i] = dy
-        if isinstance(self.images[i], gtk.gdk.Pixbuf):
+        if isinstance(self.images[i], Gdk.Pixbuf):
             w = self.images[i].get_width()
             h = self.images[i].get_height()
         else:
@@ -311,7 +310,7 @@ class Sprite:
         if self._sprites is None:
             return
         for i, img in enumerate(self.images):
-            if isinstance(img, gtk.gdk.Pixbuf):
+            if isinstance(img, Gdk.Pixbuf):
                 self._sprites.area.draw_pixbuf(self._sprites.gc, img, 0, 0,
                                                self.rect.x + self._dx[i],
                                                self.rect.y + self._dy[i])
@@ -420,7 +419,7 @@ class Sprite:
         x, y = pos
         x = x - self.rect.x
         y = y - self.rect.y
-        if isinstance(self.images[i], gtk.gdk.Pixbuf):
+        if isinstance(self.images[i], Gdk.Pixbuf):
             if y > self.images[i].get_height() - 1:
                 return(-1, -1, -1, -1)
             array = self.images[i].get_pixels()

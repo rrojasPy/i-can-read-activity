@@ -26,16 +26,20 @@
 import logging
 import os
 
-import pygtk
-pygtk.require('2.0')
 
-import gobject
-gobject.threads_init()
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gdk
+from gi.repository import Gtk
+from sugar3.graphics import style
 
-import pygst
-import gst
-import gst.interfaces
-import gtk
+
+from gi.repository import GObject, Gst
+GObject.threads_init()
+
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+#import Gst.interfaces
 
 import urllib
 
@@ -84,11 +88,11 @@ class Vplay():
         self.got_stream_info = False
         self.currentplaying = 0
 
-        self.bin = gtk.Window()
+        self.bin = Gtk.Window()
 
         self.videowidget = VideoWidget()
         self.bin.add(self.videowidget)
-        self.bin.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_NORMAL)
+        self.bin.set_type_hint(Gdk.WINDOW_TYPE_HINT_NORMAL)
         self.bin.set_decorated(False)
 
         self.bin.move(int(x), int(y))
@@ -149,19 +153,19 @@ class Vplay():
                 self.player.play()
 
 
-class GstPlayer(gobject.GObject):
+class GstPlayer(GObject.GObject):
     __gsignals__ = {
-        'error': (gobject.SIGNAL_RUN_FIRST, None, [str, str]),
-        'eos': (gobject.SIGNAL_RUN_FIRST, None, []),
-        'stream-info': (gobject.SIGNAL_RUN_FIRST, None, [object])}
+        'error': (GObject.SIGNAL_RUN_FIRST, None, [str, str]),
+        'eos': (GObject.SIGNAL_RUN_FIRST, None, []),
+        'stream-info': (GObject.SIGNAL_RUN_FIRST, None, [object])}
 
     def __init__(self, videowidget):
-        gobject.GObject.__init__(self)
+        GObject.GObject.__init__(self)
 
         self.playing = False
         self.error = False
 
-        self.player = gst.element_factory_make('playbin', 'player')
+        self.player = Gst.element_factory_make('playbin', 'player')
 
         self.videowidget = videowidget
         self._init_video_sink()
@@ -184,28 +188,28 @@ class GstPlayer(gobject.GObject):
 
     def on_message(self, bus, message):
         t = message.type
-        if t == gst.MESSAGE_ERROR:
+        if t == Gst.MESSAGE_ERROR:
             err, debug = message.parse_error()
             logging.debug('Error: %s - %s' % (err, debug))
             self.error = True
             self.emit('eos')
             self.playing = False
             self.emit('error', str(err), str(debug))
-        elif t == gst.MESSAGE_EOS:
+        elif t == Gst.MESSAGE_EOS:
             self.emit('eos')
             self.playing = False
-        elif t == gst.MESSAGE_STATE_CHANGED:
+        elif t == Gst.MESSAGE_STATE_CHANGED:
             old, new, pen = message.parse_state_changed()
-            if old == gst.STATE_READY and new == gst.STATE_PAUSED:
+            if old == Gst.STATE_READY and new == Gst.STATE_PAUSED:
                 self.emit('stream-info',
                           self.player.props.stream_info_value_array)
 
     def _init_video_sink(self):
-        self.bin = gst.Bin()
-        videoscale = gst.element_factory_make('videoscale')
+        self.bin = Gst.Bin()
+        videoscale = Gst.element_factory_make('videoscale')
         self.bin.add(videoscale)
         pad = videoscale.get_pad('sink')
-        ghostpad = gst.GhostPad('sink', pad)
+        ghostpad = Gst.GhostPad('sink', pad)
         self.bin.add_pad(ghostpad)
         videoscale.set_property('method', 0)
 
@@ -221,31 +225,31 @@ class GstPlayer(gobject.GObject):
         else:
             caps_string += 'width=480, height=360'
 
-        caps = gst.Caps(caps_string)
-        self.filter = gst.element_factory_make('capsfilter', 'filter')
+        caps = Gst.Caps(caps_string)
+        self.filter = Gst.element_factory_make('capsfilter', 'filter')
         self.bin.add(self.filter)
         self.filter.set_property('caps', caps)
 
-        conv = gst.element_factory_make('ffmpegcolorspace', 'conv')
+        conv = Gst.element_factory_make('ffmpegcolorspace', 'conv')
         self.bin.add(conv)
-        videosink = gst.element_factory_make('autovideosink')
+        videosink = Gst.element_factory_make('autovideosink')
         self.bin.add(videosink)
-        gst.element_link_many(videoscale, self.filter, conv, videosink)
+        Gst.element_link_many(videoscale, self.filter, conv, videosink)
         self.player.set_property('video-sink', self.bin)
 
     def pause(self):
-        self.player.set_state(gst.STATE_PAUSED)
+        self.player.set_state(Gst.STATE_PAUSED)
         self.playing = False
         logging.debug('pausing player')
 
     def play(self):
-        self.player.set_state(gst.STATE_PLAYING)
+        self.player.set_state(Gst.STATE_PLAYING)
         self.playing = True
         self.error = False
         logging.debug('playing player')
 
     def stop(self):
-        self.player.set_state(gst.STATE_NULL)
+        self.player.set_state(Gst.STATE_NULL)
         self.playing = False
         logging.debug('stopped player')
 
@@ -256,14 +260,14 @@ class GstPlayer(gobject.GObject):
         return self.playing
 
 
-class VideoWidget(gtk.DrawingArea):
+class VideoWidget(Gtk.DrawingArea):
 
     def __init__(self):
-        gtk.DrawingArea.__init__(self)
-        self.set_events(gtk.gdk.EXPOSURE_MASK)
+        Gtk.DrawingArea.__init__(self)
+        self.set_events(Gdk.EXPOSURE_MASK)
         self.imagesink = None
-        self.unset_flags(gtk.DOUBLE_BUFFERED)
-        self.set_flags(gtk.APP_PAINTABLE)
+        self.unset_flags(Gtk.DOUBLE_BUFFERED)
+        self.set_flags(Gtk.APP_PAINTABLE)
 
     def do_expose_event(self, event):
         if self.imagesink:
